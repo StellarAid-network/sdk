@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+docs-site
+*.tsbuildinfo
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs / OS
+*.log
+npm-debug.log*
+.DS_Store

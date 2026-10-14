@@ -1,0 +1,15 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/giveaways/index.ts",
+    "src/auth/index.ts",
+    "src/events/index.ts"
+  ],
+  "out": "docs-site",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "readme": "README.md",
+  "name": "@stellar-aid/sdk"
+}

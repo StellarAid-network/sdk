@@ -1,0 +1,8 @@
+dist
+coverage
+docs-site
+pnpm-lock.yaml
+src/generated
+src/deployments
+README.md
+CHANGELOG.md
