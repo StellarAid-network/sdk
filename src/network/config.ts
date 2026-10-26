@@ -38,6 +38,25 @@ export interface StellarAidConfig {
   fetch?: typeof fetch;
 }
 
+/**
+ * Fully resolved configuration for an SDK instance.
+ * Shared by the giveaways, payments, and contract-wrapper modules.
+ */
+export interface ResolvedConfig {
+  /** Target network. */
+  readonly network: NetworkName;
+  /** Network passphrase used to sign transactions. */
+  readonly networkPassphrase: string;
+  /** Soroban RPC endpoint. */
+  readonly rpcUrl: string;
+  /** Horizon endpoint. */
+  readonly horizonUrl: string;
+  /** Deployed contract addresses. */
+  readonly contracts: ContractAddresses;
+  /** Fetch implementation used for network calls. */
+  readonly fetch: typeof fetch;
+}
+
 /** Default RPC, Horizon, and passphrase values for each network. */
 export const NETWORK_DEFAULTS: Record<NetworkName, NetworkDefaults> = {
   testnet: {
