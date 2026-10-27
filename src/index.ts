@@ -10,3 +10,7 @@ export * from "./assets";
 export * from "./errors";
 export * from "./network";
 export * from "./types";
+export * from "./events";
+
+// Note: Server-only SEP-10 auth functions are exported exclusively via
+// `@stellar-aid/sdk/auth` to prevent accidental bundling into client/browser bundles.
