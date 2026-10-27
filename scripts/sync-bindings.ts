@@ -52,10 +52,30 @@ function generateBindings(network: string = "testnet") {
 
     const generatedIndex = path.join(outDir, "src", "index.ts");
     if (fs.existsSync(generatedIndex)) {
-      const original = fs.readFileSync(generatedIndex, "utf-8");
-      if (!original.startsWith("// @ts-nocheck")) {
-        fs.writeFileSync(generatedIndex, `// @ts-nocheck\n${original}`);
+      let content = fs.readFileSync(generatedIndex, "utf-8");
+
+      // Filter out ScSpecEntryKind >= 5 (e.g. ScSpecEntryEvent) unsupported by stellar-sdk 13 js-xdr
+      content = content.replace(/new ContractSpec\(\[\s*([\s\S]*?)\]\)/, (_match, entriesStr) => {
+        const rawEntries = entriesStr
+          .split(",")
+          .map((s: string) => s.trim().replace(/^"|"$/g, ""))
+          .filter(Boolean);
+        const filtered = rawEntries.filter((e: string) => {
+          try {
+            const buf = Buffer.from(e, "base64");
+            return buf.readInt32BE(0) < 5;
+          } catch {
+            return true;
+          }
+        });
+        const formatted = filtered.map((e: string) => ` "${e}"`).join(",\n       ");
+        return `new ContractSpec([\n       ${formatted}\n      ])`;
+      });
+
+      if (!content.startsWith("// @ts-nocheck")) {
+        content = `// @ts-nocheck\n${content}`;
       }
+      fs.writeFileSync(generatedIndex, content);
     }
   }
 

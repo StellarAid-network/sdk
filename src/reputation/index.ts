@@ -88,7 +88,10 @@ export class ReputationModule {
     try {
       const tx = await this.client.get_config();
       const sim = await tx.simulate();
-      const raw = (sim as { result?: { retval?: unknown } })?.result?.retval ?? tx.result;
+      let raw: unknown = (sim as { result?: { retval?: unknown } })?.result?.retval ?? tx.result;
+      if (raw && typeof raw === "object" && "value" in raw) {
+        raw = (raw as { value: unknown }).value;
+      }
 
       const cfg = raw as {
         tier1_threshold: bigint | number;
