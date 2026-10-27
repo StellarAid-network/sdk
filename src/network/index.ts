@@ -4,9 +4,15 @@ import type { NetworkName, SubmitResult, Asset } from "../types";
 import { NETWORK_DEFAULTS, type ContractAddresses, type StellarAidConfig, type ResolvedConfig } from "./config";
 import * as giveawaysModule from "../giveaways";
 import * as paymentsModule from "../payments";
+import { HelpRequestsModule } from "../helpRequests";
+import { ReputationModule } from "../reputation";
+import { AttestationsModule } from "../attestations";
 
 export type { ContractAddresses, NetworkDefaults, StellarAidConfig, ResolvedConfig } from "./config";
 export { NETWORK_DEFAULTS } from "./config";
+export { HelpRequestsModule } from "../helpRequests";
+export { ReputationModule } from "../reputation";
+export { AttestationsModule } from "../attestations";
 
 // ---------------------------------------------------------------------------
 // Giveaways facade (methods bound to resolved config)
@@ -53,6 +59,12 @@ export interface StellarAid {
   readonly giveaways: GiveawaysFacade;
   /** Payment transaction builders. */
   readonly payments: PaymentsFacade;
+  /** Help Request contract module. */
+  readonly helpRequests: HelpRequestsModule;
+  /** Reputation contract module. */
+  readonly reputation: ReputationModule;
+  /** Attestations contract module. */
+  readonly attestations: AttestationsModule;
   /**
    * Submit a signed transaction XDR to Horizon.
    *
@@ -174,6 +186,9 @@ export function createStellarAid(config: StellarAidConfig): StellarAid {
     assets: assetsForNetwork(resolved.network),
     giveaways,
     payments,
+    helpRequests: new HelpRequestsModule(resolved),
+    reputation: new ReputationModule(resolved),
+    attestations: new AttestationsModule(resolved),
     submit,
   };
 }
