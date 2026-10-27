@@ -1,6 +1,6 @@
 import { assetsForNetwork, type NetworkAssets } from "../assets";
 import { NetworkError, SubmissionError, ValidationError } from "../errors";
-import type { NetworkName, SubmitResult } from "../types";
+import type { NetworkName, SubmitResult, Asset } from "../types";
 import { NETWORK_DEFAULTS, type ContractAddresses, type StellarAidConfig, type ResolvedConfig } from "./config";
 import * as giveawaysModule from "../giveaways";
 import * as paymentsModule from "../payments";
@@ -34,7 +34,7 @@ export interface GiveawaysFacade {
 /** Payment builders bound to a specific SDK instance. */
 export interface PaymentsFacade {
   buildDonation(opts: paymentsModule.BuildDonationOpts): Promise<string>;
-  ensureTrustline(account: string, asset: import("../types").Asset): Promise<string | null>;
+  ensureTrustline(account: string, asset: Asset): Promise<string | null>;
 }
 
 // ---------------------------------------------------------------------------

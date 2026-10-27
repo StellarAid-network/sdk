@@ -1,0 +1,253 @@
+import { describe, it, expect } from "vitest";
+import { xdr, nativeToScVal } from "@stellar/stellar-sdk";
+import { decodeEvent } from "../src/events";
+import { EventDecodingError } from "../src/errors";
+import type { StellarAidEvent } from "../src/types";
+
+describe("Soroban event decoding module", () => {
+  it("decodes help_request created event", () => {
+    const raw = {
+      topic: ["created"],
+      value: {
+        request_id: 12n,
+        creator: "G...CREATOR",
+        token: "C...TOKEN",
+        goal: 100_000_0000000n,
+        deadline: 1800000000n,
+      },
+    };
+
+    const event = decodeEvent(raw);
+    expect(event.type).toBe("help_request.created");
+    if (event.type === "help_request.created") {
+      expect(event.requestId).toBe(12n);
+      expect(event.creator).toBe("G...CREATOR");
+      expect(event.token).toBe("C...TOKEN");
+      expect(event.goal).toBe(100_000_0000000n);
+      expect(event.deadline).toBe(1800000000n);
+    }
+  });
+
+  it("decodes help_request contributed event", () => {
+    const raw = {
+      topic: ["contributed"],
+      value: {
+        request_id: 12n,
+        contributor: "G...CONTRIBUTOR",
+        amount: 25_0000000n,
+        total_raised: 50_0000000n,
+      },
+    };
+
+    const event = decodeEvent(raw);
+    expect(event.type).toBe("help_request.contributed");
+    if (event.type === "help_request.contributed") {
+      expect(event.requestId).toBe(12n);
+      expect(event.contributor).toBe("G...CONTRIBUTOR");
+      expect(event.amount).toBe(25_0000000n);
+      expect(event.totalRaised).toBe(50_0000000n);
+    }
+  });
+
+  it("decodes funded and failed events", () => {
+    const funded = decodeEvent({
+      topic: ["funded"],
+      value: { request_id: 1n, total_raised: 100n },
+    });
+    expect(funded.type).toBe("help_request.funded");
+    if (funded.type === "help_request.funded") {
+      expect(funded.requestId).toBe(1n);
+      expect(funded.totalRaised).toBe(100n);
+    }
+
+    const failed = decodeEvent({
+      topic: ["failed"],
+      value: { request_id: 2n, total_raised: 40n },
+    });
+    expect(failed.type).toBe("help_request.failed");
+    if (failed.type === "help_request.failed") {
+      expect(failed.requestId).toBe(2n);
+      expect(failed.totalRaised).toBe(40n);
+    }
+  });
+
+  it("decodes milestone lifecycle events (submitted, approved, released)", () => {
+    const sub = decodeEvent({
+      topic: ["milestone_submitted"],
+      value: {
+        request_id: 5n,
+        index: 0,
+        evidence_hash: "a".repeat(64),
+      },
+    });
+    expect(sub.type).toBe("help_request.milestone_submitted");
+    if (sub.type === "help_request.milestone_submitted") {
+      expect(sub.index).toBe(0);
+      expect(sub.evidenceHash).toBe("a".repeat(64));
+    }
+
+    const app = decodeEvent({
+      topic: ["milestone_approved"],
+      value: {
+        request_id: 5n,
+        index: 0,
+        approver: "G...APPROVER",
+      },
+    });
+    expect(app.type).toBe("help_request.milestone_approved");
+    if (app.type === "help_request.milestone_approved") {
+      expect(app.approver).toBe("G...APPROVER");
+    }
+
+    const rel = decodeEvent({
+      topic: ["milestone_released"],
+      value: {
+        request_id: 5n,
+        index: 0,
+        amount: 400_000n,
+      },
+    });
+    expect(rel.type).toBe("help_request.milestone_released");
+    if (rel.type === "help_request.milestone_released") {
+      expect(rel.amount).toBe(400_000n);
+    }
+  });
+
+  it("decodes refunded and cancelled events", () => {
+    const ref = decodeEvent({
+      topic: ["refunded"],
+      value: {
+        request_id: 10n,
+        contributor: "G...REFUNDEE",
+        amount: 50_000n,
+      },
+    });
+    expect(ref.type).toBe("help_request.refunded");
+    if (ref.type === "help_request.refunded") {
+      expect(ref.amount).toBe(50_000n);
+    }
+
+    const can = decodeEvent({
+      topic: ["cancelled"],
+      value: { request_id: 10n },
+    });
+    expect(can.type).toBe("help_request.cancelled");
+  });
+
+  it("decodes reputation and attestation events", () => {
+    const rep = decodeEvent({
+      topic: ["score_changed"],
+      value: {
+        subject: "G...SUBJECT",
+        delta: 25,
+        new_score: 125,
+        ref_id: "req-1",
+      },
+    });
+    expect(rep.type).toBe("reputation.score_changed");
+    if (rep.type === "reputation.score_changed") {
+      expect(rep.delta).toBe(25);
+      expect(rep.newScore).toBe(125);
+    }
+
+    const att = decodeEvent({
+      topic: ["attested"],
+      value: {
+        attestation_id: 101n,
+        attestor: "G...ATTESTOR",
+        subject: "G...SUBJECT",
+      },
+    });
+    expect(att.type).toBe("attestation.attested");
+
+    const rev = decodeEvent({
+      topic: ["revoked"],
+      value: {
+        attestation_id: 101n,
+        attestor: "G...ATTESTOR",
+        subject: "G...SUBJECT",
+      },
+    });
+    expect(rev.type).toBe("attestation.revoked");
+  });
+
+  it("decodes raw ScVal XDR strings as generated by Soroban RPC", () => {
+    const topicXdr = xdr.ScVal.scvSymbol("created").toXDR("base64");
+    const dataVal = nativeToScVal(
+      {
+        request_id: 99n,
+        creator: "G...XDR_CREATOR",
+        token: "C...XDR_TOKEN",
+        goal: 5000000n,
+        deadline: 2000000000n,
+      },
+      { type: undefined },
+    );
+    const dataXdr = dataVal.toXDR("base64");
+
+    const event = decodeEvent({
+      topic: [topicXdr],
+      value: dataXdr,
+    });
+
+    expect(event.type).toBe("help_request.created");
+    if (event.type === "help_request.created") {
+      expect(event.requestId).toBe(99n);
+      expect(event.creator).toBe("G...XDR_CREATOR");
+    }
+  });
+
+  it("throws EventDecodingError on unknown event type or missing topics", () => {
+    expect(() =>
+      decodeEvent({
+        topic: ["unknown_event_topic"],
+        value: {},
+      }),
+    ).toThrowError(EventDecodingError);
+
+    expect(() =>
+      decodeEvent({
+        topic: [],
+        value: {},
+      }),
+    ).toThrowError(EventDecodingError);
+  });
+
+  it("exhaustive discriminated union type check", () => {
+    // Type-level test: compiler guarantees all variants of StellarAidEvent are covered
+    function handleEvent(e: StellarAidEvent): string {
+      switch (e.type) {
+        case "help_request.created":
+          return `created:${e.requestId}`;
+        case "help_request.contributed":
+          return `contributed:${e.amount}`;
+        case "help_request.funded":
+          return `funded:${e.totalRaised}`;
+        case "help_request.failed":
+          return `failed:${e.totalRaised}`;
+        case "help_request.milestone_submitted":
+          return `milestone_submitted:${e.index}`;
+        case "help_request.milestone_approved":
+          return `milestone_approved:${e.approver}`;
+        case "help_request.milestone_released":
+          return `milestone_released:${e.amount}`;
+        case "help_request.refunded":
+          return `refunded:${e.amount}`;
+        case "help_request.cancelled":
+          return `cancelled:${e.requestId}`;
+        case "reputation.score_changed":
+          return `score_changed:${e.newScore}`;
+        case "attestation.attested":
+          return `attested:${e.attestationId}`;
+        case "attestation.revoked":
+          return `revoked:${e.attestationId}`;
+      }
+    }
+
+    const testEvent: StellarAidEvent = {
+      type: "help_request.cancelled",
+      requestId: 42n,
+    };
+    expect(handleEvent(testEvent)).toBe("cancelled:42");
+  });
+});
