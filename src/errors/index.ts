@@ -81,3 +81,11 @@ export class AuthError extends StellarAidError {
     this.name = "AuthError";
   }
 }
+
+/** A Soroban contract event failed to decode. */
+export class EventDecodingError extends StellarAidError {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "EventDecodingError";
+  }
+}
