@@ -49,6 +49,14 @@ function generateBindings(network: string = "testnet") {
       `stellar contract bindings typescript --contract-id "${id}" --network "${network}" --output-dir "${outDir}" --overwrite`,
       { stdio: "inherit" },
     );
+
+    const generatedIndex = path.join(outDir, "src", "index.ts");
+    if (fs.existsSync(generatedIndex)) {
+      const original = fs.readFileSync(generatedIndex, "utf-8");
+      if (!original.startsWith("// @ts-nocheck")) {
+        fs.writeFileSync(generatedIndex, `// @ts-nocheck\n${original}`);
+      }
+    }
   }
 
   console.log("All bindings generated successfully.");
