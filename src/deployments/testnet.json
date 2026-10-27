@@ -2,8 +2,8 @@
   "network": "testnet",
   "networkPassphrase": "Test SDF Network ; September 2015",
   "contracts": {
-    "help_request": "",
-    "reputation": "",
-    "attestation": ""
+    "help_request": "CBPW3FPPKPT4YWT7NSWM2EZ5AMONGQQQBPAEYZBSBWSOUGY5B26A7RLL",
+    "reputation": "CC46Y6JBSNNTHPZZCLLUILMWMSNLRC3MV46UQ2REQX3N4WI6PTDPOZ2C",
+    "attestation": "CBGSEMRF6DKWPGYGFJBQG5UEUBGFDHEJQUB5EOYTS4C746J54AYAS7GN"
   }
 }
