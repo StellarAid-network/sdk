@@ -89,3 +89,71 @@ export class EventDecodingError extends StellarAidError {
     this.name = "EventDecodingError";
   }
 }
+
+export const HELP_REQUEST_ERRORS: Record<number, string> = {
+  1: "NotInitialized",
+  2: "AlreadyInitialized",
+  3: "RequestNotFound",
+  4: "InvalidAmount",
+  5: "DeadlinePassed",
+  6: "DeadlineNotReached",
+  7: "NotOpen",
+  8: "Unauthorized",
+  9: "TokenNotAllowed",
+  10: "NothingToRefund",
+  11: "MilestoneNotFound",
+  12: "MilestoneAlreadyReleased",
+  13: "MilestoneNotSubmitted",
+  14: "MilestoneAlreadySubmitted",
+  15: "MilestoneAlreadyApproved",
+  16: "InsufficientApprovals",
+  17: "InvalidMilestoneSchedule",
+  18: "MilestoneOutOfOrder",
+  19: "NotDisputedOrCancelled",
+};
+
+export const REPUTATION_ERRORS: Record<number, string> = {
+  1: "NotInitialized",
+  2: "AlreadyInitialized",
+  3: "Unauthorized",
+  4: "InvalidDelta",
+};
+
+export const ATTESTATION_ERRORS: Record<number, string> = {
+  1: "NotInitialized",
+  2: "AlreadyInitialized",
+  3: "Unauthorized",
+  4: "AttestationNotFound",
+  5: "AlreadyRevoked",
+  6: "InvalidExpiry",
+};
+
+/**
+ * Maps a numeric error code to a typed ContractError with human-readable name.
+ */
+export function mapContractError(
+  code: number,
+  table: Record<number, string>,
+  message?: string,
+): ContractError {
+  const name = table[code] ?? "UnknownContractError";
+  return new ContractError(code, name, message ?? `Contract error ${name} (#${code})`);
+}
+
+/**
+ * Extracts numeric error code from error messages or simulation results if available.
+ */
+export function extractContractError(
+  err: unknown,
+  table: Record<number, string>,
+): Error {
+  if (err instanceof ContractError) return err;
+  const str = String(err instanceof Error ? err.message : err);
+  const match = str.match(/(?:Error\(Contract,\s*#?|ContractError:?\s*|Error Code:\s*)(\d+)/i);
+  if (match && match[1]) {
+    const code = parseInt(match[1], 10);
+    return mapContractError(code, table, str);
+  }
+  return err instanceof Error ? err : new StellarAidError(str);
+}
+
