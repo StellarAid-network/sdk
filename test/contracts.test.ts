@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createStellarAid,
   ContractError,
@@ -85,26 +85,73 @@ describe("Contract wrappers and error mapping", () => {
     });
   });
 
-  describe("Live Testnet read calls", () => {
-    it("reads reputation config from deployed contract on testnet", async () => {
-      const cfg = await aid.reputation.getConfig();
+  describe("Contract read wrapper normalization", () => {
+    it("reads reputation config from contract wrapper", async () => {
+      const localAid = createStellarAid({ network: "testnet" });
+      vi.spyOn(localAid.reputation.rawClient, "get_config").mockResolvedValue({
+        toXDR: () => "AAAA",
+        simulate: async () => ({
+          result: {
+            retval: {
+              tier1_threshold: 10n,
+              tier2_threshold: 50n,
+              tier3_threshold: 100n,
+            },
+          },
+        }),
+        result: {
+          tier1_threshold: 10n,
+          tier2_threshold: 50n,
+          tier3_threshold: 100n,
+        },
+      } as never);
+
+      const cfg = await localAid.reputation.getConfig();
       expect(cfg.tier1Threshold).toBe(10);
       expect(cfg.tier2Threshold).toBe(50);
       expect(cfg.tier3Threshold).toBe(100);
     });
 
     it("reads fresh subject score and badges", async () => {
-      const randomAccount = "GCFGKLCBV5IGJYGRR7FJNU53HFV5674PMQNNJT6HRAFGUAHZ7V3ZELXR";
-      const score = await aid.reputation.getScore(randomAccount);
-      expect(typeof score).toBe("number");
+      const localAid = createStellarAid({ network: "testnet" });
+      vi.spyOn(localAid.reputation.rawClient, "get_score").mockResolvedValue({
+        toXDR: () => "AAAA",
+        simulate: async () => ({ result: { retval: 55n } }),
+        result: 55n,
+      } as never);
+      vi.spyOn(localAid.reputation.rawClient, "get_badges").mockResolvedValue({
+        toXDR: () => "AAAA",
+        simulate: async () => ({
+          result: {
+            retval: [
+              { name: "Helper", tier: 1, threshold: 10n },
+              { name: "Advocate", tier: 2, threshold: 50n },
+            ],
+          },
+        }),
+        result: [],
+      } as never);
 
-      const badges = await aid.reputation.getBadges(randomAccount);
-      expect(Array.isArray(badges)).toBe(true);
+      const randomAccount = "GCFGKLCBV5IGJYGRR7FJNU53HFV5674PMQNNJT6HRAFGUAHZ7V3ZELXR";
+      const score = await localAid.reputation.getScore(randomAccount);
+      expect(score).toBe(55);
+
+      const badges = await localAid.reputation.getBadges(randomAccount);
+      expect(badges).toHaveLength(2);
+      expect(badges[0]?.name).toBe("Helper");
+      expect(badges[1]?.name).toBe("Advocate");
     });
 
     it("reads empty attestations for an unverified subject", async () => {
+      const localAid = createStellarAid({ network: "testnet" });
+      vi.spyOn(localAid.attestations.rawClient, "get_attestations").mockResolvedValue({
+        toXDR: () => "AAAA",
+        simulate: async () => ({ result: { retval: [] } }),
+        result: [],
+      } as never);
+
       const randomAccount = "GBTYIQPBLDAXZ3DGFY5KAYFHRVGOF5V5GU263RTRVQQOAIICCW5S4VEQ";
-      const attestations = await aid.attestations.get(randomAccount);
+      const attestations = await localAid.attestations.get(randomAccount);
       expect(Array.isArray(attestations)).toBe(true);
       expect(attestations.length).toBe(0);
     });

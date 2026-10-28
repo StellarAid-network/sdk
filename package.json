@@ -67,6 +67,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:integration": "vitest run test/help-requests-lifecycle.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "docs": "typedoc",
