@@ -1,4 +1,4 @@
-import { Buffer } from "node:buffer";
+import type { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import { ContractError, createStellarAid, parseAmount } from "../src";
 
