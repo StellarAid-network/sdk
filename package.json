@@ -1,6 +1,7 @@
 {
   "name": "@stellar-aid/sdk",
-  "version": "0.1.0",
+  "version": "0.1.0-testnet",
+  "contractsRelease": "v0.1.0-testnet",
   "description": "TypeScript SDK for StellarAid: claimable-balance giveaways, SEP-10 auth, generated contract bindings, and shared types.",
   "license": "MIT",
   "type": "module",

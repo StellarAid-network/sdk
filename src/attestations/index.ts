@@ -4,12 +4,16 @@
 
 import { Buffer } from "node:buffer";
 import type { ResolvedConfig } from "../network/config";
-import {
-  ATTESTATION_ERRORS,
-  extractContractError,
-} from "../errors";
+import { ATTESTATION_ERRORS, extractContractError, ValidationError } from "../errors";
 import { AttestationBinding } from "../generated";
+import {
+  assertAccountAddress,
+  assertNonNegativeId,
+  assertNotSecretKey,
+  assertValidTimestamp,
+} from "../validation";
 
+/** Normalized on-chain attestation record. */
 export interface AttestationItem {
   id: bigint;
   attestor: string;
@@ -21,25 +25,41 @@ export interface AttestationItem {
   createdAt: Date;
 }
 
+/** Parameters for {@link AttestationsModule.attest}. */
 export interface AttestParams {
+  /** Whitelisted attestor account (`G...`). */
   attestor: string;
+  /** Subject account (`G...`) receiving the attestation. */
   subject: string;
+  /** Attestation category symbol (e.g. `verified_org`, `community_voucher`). */
   kind: string;
+  /** 32-byte off-chain attestation document digest. */
   contentHash: string | Buffer;
+  /** Optional expiration timestamp. */
   expiresAt?: Date | number | bigint;
 }
 
+/** Parameters for {@link AttestationsModule.revoke}. */
 export interface RevokeParams {
+  /** Original attestor account (`G...`). */
   attestor: string;
+  /** Attestation identifier to revoke. */
   attestationId: bigint | number;
 }
 
-function toBytes32(input: string | Buffer): Buffer {
+function toBytes32(input: string | Buffer, field = "contentHash"): Buffer {
   if (Buffer.isBuffer(input)) {
+    if (input.length === 0) {
+      throw new ValidationError(`Invalid ${field}: expected a non-empty 32-byte Buffer.`);
+    }
     if (input.length === 32) return input;
     const buf = Buffer.alloc(32);
     input.copy(buf);
     return buf;
+  }
+  assertNotSecretKey(input, field);
+  if (typeof input !== "string" || input.trim().length === 0) {
+    throw new ValidationError(`Invalid ${field}: expected a non-empty hex string or Buffer.`);
   }
   const clean = input.startsWith("0x") ? input.slice(2) : input;
   if (/^[0-9a-fA-F]{64}$/.test(clean)) {
@@ -50,6 +70,7 @@ function toBytes32(input: string | Buffer): Buffer {
   return buf;
 }
 
+/** Ergonomic wrapper around the generated Attestation Soroban contract client. */
 export class AttestationsModule {
   public readonly config: ResolvedConfig;
   private readonly client: AttestationBinding.Client;
@@ -75,6 +96,7 @@ export class AttestationsModule {
    * Read all active, non-expired, non-revoked attestations for a subject.
    */
   public async get(subject: string): Promise<AttestationItem[]> {
+    assertAccountAddress(subject, "subject");
     try {
       const tx = await this.client.get_attestations({ subject });
       const sim = await tx.simulate();
@@ -110,18 +132,30 @@ export class AttestationsModule {
    * Build an unsigned transaction to create an attestation.
    */
   public async attest(params: AttestParams): Promise<{ xdr: string }> {
-    try {
-      const expiresAt = params.expiresAt
-        ? params.expiresAt instanceof Date
-          ? BigInt(Math.floor(params.expiresAt.getTime() / 1000))
-          : BigInt(params.expiresAt)
+    assertAccountAddress(params.attestor, "attestor");
+    assertAccountAddress(params.subject, "subject");
+    assertNotSecretKey(params.kind, "kind");
+    if (
+      !params.kind ||
+      typeof params.kind !== "string" ||
+      !/^[a-zA-Z0-9_]{1,32}$/.test(params.kind)
+    ) {
+      throw new ValidationError(
+        `Invalid kind "${String(params.kind)}": expected a 1..32 character Soroban symbol ([a-zA-Z0-9_]).`,
+      );
+    }
+    const contentHash = toBytes32(params.contentHash, "contentHash");
+    const expiresAt =
+      params.expiresAt !== undefined
+        ? assertValidTimestamp(params.expiresAt, "expiresAt")
         : undefined;
 
+    try {
       const tx = await this.client.attest({
         attestor: params.attestor,
         subject: params.subject,
         kind: params.kind,
-        content_hash: toBytes32(params.contentHash),
+        content_hash: contentHash,
         expires_at: expiresAt,
       });
 
@@ -137,10 +171,12 @@ export class AttestationsModule {
    * Build an unsigned transaction to revoke an attestation.
    */
   public async revoke(params: RevokeParams): Promise<{ xdr: string }> {
+    assertAccountAddress(params.attestor, "attestor");
+    const attestationId = assertNonNegativeId(params.attestationId, "attestationId");
     try {
       const tx = await this.client.revoke({
         attestor: params.attestor,
-        attestation_id: BigInt(params.attestationId),
+        attestation_id: attestationId,
       });
 
       return {

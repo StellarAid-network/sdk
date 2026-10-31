@@ -6,6 +6,7 @@
  * convert between them.
  */
 
+import { StrKey } from "@stellar/stellar-sdk";
 import { ValidationError } from "../errors";
 import type { Asset, NetworkName } from "../types";
 
@@ -29,6 +30,21 @@ export const STELLAR_DECIMALS = 7;
 
 /** Return the USDC asset for a network, if an issuer is configured. */
 export function usdc(network: NetworkName, issuer?: string): Asset {
+  if (!(network in USDC_ISSUERS)) {
+    throw new ValidationError(`Unknown network: "${String(network)}"`);
+  }
+  if (issuer !== undefined) {
+    if (StrKey.isValidEd25519SecretSeed(issuer)) {
+      throw new ValidationError(
+        "Invalid issuer: secret keys (S...) are never accepted by @stellar-aid/sdk.",
+      );
+    }
+    if (!StrKey.isValidEd25519PublicKey(issuer)) {
+      throw new ValidationError(
+        `Invalid USDC issuer "${issuer}": expected a Stellar G... address.`,
+      );
+    }
+  }
   const resolved = issuer ?? USDC_ISSUERS[network];
   return resolved ? { code: "USDC", issuer: resolved } : { code: "USDC" };
 }

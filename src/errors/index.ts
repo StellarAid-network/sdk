@@ -143,10 +143,7 @@ export function mapContractError(
 /**
  * Extracts numeric error code from error messages or simulation results if available.
  */
-export function extractContractError(
-  err: unknown,
-  table: Record<number, string>,
-): Error {
+export function extractContractError(err: unknown, table: Record<number, string>): Error {
   if (err instanceof ContractError) return err;
   const str = String(err instanceof Error ? err.message : err);
   const match = str.match(/(?:Error\(Contract,\s*#?|ContractError:?\s*|Error Code:\s*)(\d+)/i);
@@ -156,4 +153,3 @@ export function extractContractError(
   }
   return err instanceof Error ? err : new StellarAidError(str);
 }
-

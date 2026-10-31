@@ -8,10 +8,15 @@ import { xdr, scValToNative } from "@stellar/stellar-sdk";
 import type { StellarAidEvent } from "../types";
 import { EventDecodingError } from "../errors";
 
+/** Raw Soroban RPC event payload accepted by {@link decodeEvent}. */
 export interface RawEventInput {
+  /** Event topic ScVals (base64 XDR strings or decoded values). */
   topic: (string | unknown)[];
+  /** Event body ScVal (base64 XDR string, `{ xdr }`, or decoded object/Map). */
   value: string | { xdr?: string } | unknown;
+  /** Optional emitting Soroban contract address (`C...`). */
   contractId?: string;
+  /** Optional ledger sequence number in which the event was emitted. */
   ledger?: number;
 }
 

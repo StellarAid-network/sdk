@@ -1,14 +1,25 @@
 import { assetsForNetwork, type NetworkAssets } from "../assets";
 import { NetworkError, SubmissionError, ValidationError } from "../errors";
 import type { NetworkName, SubmitResult, Asset } from "../types";
-import { NETWORK_DEFAULTS, type ContractAddresses, type StellarAidConfig, type ResolvedConfig } from "./config";
+import {
+  NETWORK_DEFAULTS,
+  type ContractAddresses,
+  type StellarAidConfig,
+  type ResolvedConfig,
+} from "./config";
 import * as giveawaysModule from "../giveaways";
 import * as paymentsModule from "../payments";
 import { HelpRequestsModule } from "../helpRequests";
 import { ReputationModule } from "../reputation";
 import { AttestationsModule } from "../attestations";
+import { assertAccountOrContractAddress, assertNotSecretKey } from "../validation";
 
-export type { ContractAddresses, NetworkDefaults, StellarAidConfig, ResolvedConfig } from "./config";
+export type {
+  ContractAddresses,
+  NetworkDefaults,
+  StellarAidConfig,
+  ResolvedConfig,
+} from "./config";
 export { NETWORK_DEFAULTS } from "./config";
 export { HelpRequestsModule } from "../helpRequests";
 export { ReputationModule } from "../reputation";
@@ -20,16 +31,24 @@ export { AttestationsModule } from "../attestations";
 
 /** Giveaway builders and readers bound to a specific SDK instance. */
 export interface GiveawaysFacade {
+  /** Build an unsigned claimable-balance creation transaction XDR. */
   buildCreate(opts: giveawaysModule.BuildCreateOpts): Promise<string>;
+  /** Build an unsigned claim transaction XDR. */
   buildClaim(opts: giveawaysModule.BuildClaimOpts): Promise<string>;
+  /** Build an unsigned creator reclaim transaction XDR for an expired balance. */
   buildReclaim(opts: giveawaysModule.BuildReclaimOpts): Promise<string>;
+  /** List claimable balances where `account` is a claimant. */
   listClaimable(account: string): Promise<giveawaysModule.ClaimableBalance[]>;
+  /** List claimable balances created/sponsored by `account`. */
   listCreated(account: string): Promise<giveawaysModule.ClaimableBalance[]>;
+  /** Read a single claimable balance entry by Horizon ID. */
   getBalance(id: string): Promise<giveawaysModule.ClaimableBalance>;
+  /** Evaluate client-side anti-bot eligibility rules for `account`. */
   evaluateEligibility(
     account: string,
     rules: giveawaysModule.EligibilityRules,
   ): Promise<giveawaysModule.EligibilityResult>;
+  /** Claimable-balance time-window and reclaim predicate helpers. */
   predicates: typeof giveawaysModule.predicates;
 }
 
@@ -39,7 +58,9 @@ export interface GiveawaysFacade {
 
 /** Payment builders bound to a specific SDK instance. */
 export interface PaymentsFacade {
+  /** Build an unsigned payment transaction XDR with optional memo. */
   buildDonation(opts: paymentsModule.BuildDonationOpts): Promise<string>;
+  /** Return an unsigned `change_trust` XDR if `account` lacks a trustline for `asset`, or `null`. */
   ensureTrustline(account: string, asset: Asset): Promise<string | null>;
 }
 
@@ -98,6 +119,12 @@ export function createStellarAid(config: StellarAidConfig): StellarAid {
     attestation: config.contracts?.attestation ?? defaults.contracts.attestation,
   };
 
+  for (const [key, addr] of Object.entries(contracts)) {
+    if (addr) {
+      assertAccountOrContractAddress(addr, `contracts.${key}`);
+    }
+  }
+
   const fetchImpl = config.fetch ?? globalThis.fetch;
 
   const resolved: ResolvedConfig = {
@@ -113,7 +140,10 @@ export function createStellarAid(config: StellarAidConfig): StellarAid {
   // submit()
   // -------------------------------------------------------------------------
   async function submit(signedXdr: string): Promise<SubmitResult> {
-    if (!signedXdr) throw new ValidationError("signedXdr must not be empty");
+    assertNotSecretKey(signedXdr, "signedXdr");
+    if (!signedXdr || typeof signedXdr !== "string") {
+      throw new ValidationError("signedXdr must not be empty");
+    }
 
     const url = `${resolved.horizonUrl}/transactions`;
     let res: Response;
@@ -127,7 +157,7 @@ export function createStellarAid(config: StellarAidConfig): StellarAid {
       throw new NetworkError(`Horizon unreachable: ${String(err)}`, { cause: err });
     }
 
-    const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
     if (!res.ok) {
       // Extract result codes from Horizon's RFC 7807-style error body.

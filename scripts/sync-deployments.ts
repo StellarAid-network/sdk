@@ -29,8 +29,16 @@ function resolveContractId(entry: ContractDeploymentEntry | string | undefined):
   return entry.id || "";
 }
 
+function resolveWasmHash(entry: ContractDeploymentEntry | string | undefined): string {
+  if (!entry || typeof entry === "string") return "";
+  return entry.wasmHash || "";
+}
+
 function syncNetwork(network: string) {
   const root = path.resolve(__dirname, "..");
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(root, "package.json"), "utf-8")) as {
+    contractsRelease?: string;
+  };
   const contractsDeployPath = path.resolve(root, `../contracts/deployments/${network}.json`);
   const sdkDeployPath = path.resolve(root, `src/deployments/${network}.json`);
 
@@ -45,10 +53,16 @@ function syncNetwork(network: string) {
   const sdkDeployData = {
     network: data.network,
     networkPassphrase: data.networkPassphrase,
+    contractsRelease: pkg.contractsRelease ?? "v0.1.0-testnet",
     contracts: {
       help_request: resolveContractId(data.contracts.help_request),
       reputation: resolveContractId(data.contracts.reputation),
       attestation: resolveContractId(data.contracts.attestation),
+    },
+    wasmHashes: {
+      help_request: resolveWasmHash(data.contracts.help_request),
+      reputation: resolveWasmHash(data.contracts.reputation),
+      attestation: resolveWasmHash(data.contracts.attestation),
     },
   };
 

@@ -3,24 +3,31 @@
  */
 
 import type { ResolvedConfig } from "../network/config";
-import {
-  extractContractError,
-  REPUTATION_ERRORS,
-} from "../errors";
+import { extractContractError, REPUTATION_ERRORS } from "../errors";
 import { ReputationBinding } from "../generated";
+import { assertAccountAddress } from "../validation";
 
+/** Earned on-chain reputation badge. */
 export interface ReputationBadge {
+  /** Human-readable badge name (`Helper`, `Advocate`, `Champion`). */
   name: string;
+  /** Numeric badge tier (`1`, `2`, `3`). */
   tier: number;
+  /** Score threshold required for this tier. */
   threshold: number;
 }
 
+/** On-chain badge threshold configuration. */
 export interface ReputationConfig {
+  /** Minimum score for Tier 1 (`Helper`). */
   tier1Threshold: number;
+  /** Minimum score for Tier 2 (`Advocate`). */
   tier2Threshold: number;
+  /** Minimum score for Tier 3 (`Champion`). */
   tier3Threshold: number;
 }
 
+/** Ergonomic wrapper around the generated Reputation Soroban contract client. */
 export class ReputationModule {
   public readonly config: ResolvedConfig;
   private readonly client: ReputationBinding.Client;
@@ -46,6 +53,7 @@ export class ReputationModule {
    * Read the reputation score for an address. Returns 0 if none recorded.
    */
   public async getScore(subject: string): Promise<number> {
+    assertAccountAddress(subject, "subject");
     try {
       const tx = await this.client.get_score({ subject });
       const sim = await tx.simulate();
@@ -60,6 +68,7 @@ export class ReputationModule {
    * Read the earned badges for an address.
    */
   public async getBadges(subject: string): Promise<ReputationBadge[]> {
+    assertAccountAddress(subject, "subject");
     try {
       const tx = await this.client.get_badges({ subject });
       const sim = await tx.simulate();

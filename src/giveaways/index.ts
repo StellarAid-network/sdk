@@ -26,6 +26,14 @@ import {
 import { ValidationError, NetworkError } from "../errors";
 import type { Asset, StellarAddress } from "../types";
 import type { ResolvedConfig } from "../network/config";
+import {
+  assertAccountAddress,
+  assertNotSecretKey,
+  assertPositiveAmount,
+  assertValidAsset,
+  assertValidDate,
+  assertValidDateWindow,
+} from "../validation";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -72,6 +80,7 @@ export const predicates = {
    * predicates.window({ from: new Date(), until: new Date(Date.now() + 86_400_000) })
    */
   window(opts: WindowPredicateOpts): ReturnType<typeof Claimant.predicateUnconditional> {
+    assertValidDateWindow(opts.from, opts.until, "from", "until");
     const conditions: ReturnType<typeof Claimant.predicateUnconditional>[] = [];
 
     if (opts.from) {
@@ -107,6 +116,7 @@ export const predicates = {
    * predicates.creatorAfter(new Date(Date.now() + 7 * 86_400_000))
    */
   creatorAfter(expiresAt: Date): ReturnType<typeof Claimant.predicateUnconditional> {
+    assertValidDate(expiresAt, "expiresAt");
     return Claimant.predicateNot(
       Claimant.predicateBeforeAbsoluteTime(String(Math.floor(expiresAt.getTime() / 1000))),
     );
@@ -153,8 +163,17 @@ export async function evaluateEligibility(
   rules: EligibilityRules,
   config: ResolvedConfig,
 ): Promise<EligibilityResult> {
+  assertNotSecretKey(account, "account");
   if (!account || typeof account !== "string") {
     return { eligible: false, reasons: ["Invalid account address"] };
+  }
+  try {
+    assertAccountAddress(account, "account");
+  } catch {
+    return { eligible: false, reasons: ["Invalid account address"] };
+  }
+  if (rules.minBalance !== undefined) {
+    assertPositiveAmount(rules.minBalance, "rules.minBalance");
   }
 
   const reasons: string[] = [];
@@ -180,7 +199,7 @@ export async function evaluateEligibility(
 
   // Account age check.
   if (rules.minAgeDays !== undefined && rules.minAgeDays > 0) {
-    const sequence = BigInt((accountData.sequence) ?? "0");
+    const sequence = BigInt(accountData.sequence ?? "0");
     if (sequence === 0n) {
       reasons.push(`Account has no transaction history (minimum age: ${rules.minAgeDays} days)`);
     }
@@ -290,17 +309,23 @@ export interface BuildCreateOpts {
 export async function buildCreate(opts: BuildCreateOpts, config: ResolvedConfig): Promise<string> {
   const { creator, asset, amountPerClaim, claimers, maxClaimants, claimableFrom, expiresAt } = opts;
 
-  if (!creator) throw new ValidationError("creator is required");
-  if (!amountPerClaim || parseFloat(amountPerClaim) <= 0) {
-    throw new ValidationError("amountPerClaim must be a positive decimal string");
-  }
+  assertAccountAddress(creator, "creator");
+  assertValidAsset(asset, "asset");
+  assertPositiveAmount(amountPerClaim, "amountPerClaim");
+  assertValidDateWindow(claimableFrom, expiresAt, "claimableFrom", "expiresAt");
+
   if (claimers !== undefined && maxClaimants !== undefined) {
     throw new ValidationError("specify either claimers or maxClaimants, not both");
   }
-  if (claimers !== undefined && claimers.length === 0) {
-    throw new ValidationError("claimers list must not be empty");
+  if (claimers !== undefined) {
+    if (claimers.length === 0) {
+      throw new ValidationError("claimers list must not be empty");
+    }
+    for (let idx = 0; idx < claimers.length; idx++) {
+      assertAccountAddress(claimers[idx]!, `claimers[${idx}]`);
+    }
   }
-  if (maxClaimants !== undefined && maxClaimants <= 0) {
+  if (maxClaimants !== undefined && (!Number.isInteger(maxClaimants) || maxClaimants <= 0)) {
     throw new ValidationError("maxClaimants must be a positive integer");
   }
 
@@ -324,7 +349,9 @@ export async function buildCreate(opts: BuildCreateOpts, config: ResolvedConfig)
   }
 
   // Build the creator's reclaim predicate (active only after expiry).
-  const creatorPredicate = expiresAt ? predicates.creatorAfter(expiresAt) : Claimant.predicateUnconditional();
+  const creatorPredicate = expiresAt
+    ? predicates.creatorAfter(expiresAt)
+    : Claimant.predicateUnconditional();
 
   // Batch claimers into groups. Each balance holds up to MAX_CLAIMANTS_PER_BALANCE
   // total claimants. We always reserve one slot for the creator's reclaim entry,
@@ -415,8 +442,11 @@ export interface BuildClaimOpts {
  * @returns Unsigned transaction XDR string.
  */
 export async function buildClaim(opts: BuildClaimOpts, config: ResolvedConfig): Promise<string> {
-  if (!opts.claimer) throw new ValidationError("claimer is required");
-  if (!opts.balanceId) throw new ValidationError("balanceId is required");
+  assertAccountAddress(opts.claimer, "claimer");
+  assertNotSecretKey(opts.balanceId, "balanceId");
+  if (!opts.balanceId || typeof opts.balanceId !== "string") {
+    throw new ValidationError("balanceId is required");
+  }
 
   const server2 = `${config.horizonUrl}/accounts/${encodeURIComponent(opts.claimer)}`;
   let claimerAccount: { sequence: string };
@@ -433,9 +463,7 @@ export async function buildClaim(opts: BuildClaimOpts, config: ResolvedConfig): 
     networkPassphrase: config.networkPassphrase,
   });
 
-  tx2.addOperation(
-    Operation.claimClaimableBalance({ balanceId: opts.balanceId }),
-  );
+  tx2.addOperation(Operation.claimClaimableBalance({ balanceId: opts.balanceId }));
 
   return tx2.setTimeout(300).build().toXDR();
 }
@@ -466,12 +494,17 @@ export async function buildReclaim(
   opts: BuildReclaimOpts,
   config: ResolvedConfig,
 ): Promise<string> {
-  if (!opts.creator) throw new ValidationError("creator is required");
-  if (!opts.balanceId) throw new ValidationError("balanceId is required");
+  assertAccountAddress(opts.creator, "creator");
+  assertNotSecretKey(opts.balanceId, "balanceId");
+  if (!opts.balanceId || typeof opts.balanceId !== "string") {
+    throw new ValidationError("balanceId is required");
+  }
 
   let creatorData: { sequence: string };
   try {
-    const res = await config.fetch(`${config.horizonUrl}/accounts/${encodeURIComponent(opts.creator)}`);
+    const res = await config.fetch(
+      `${config.horizonUrl}/accounts/${encodeURIComponent(opts.creator)}`,
+    );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     creatorData = (await res.json()) as { sequence: string };
   } catch (err: unknown) {
@@ -499,6 +532,7 @@ export async function listClaimable(
   account: StellarAddress,
   config: ResolvedConfig,
 ): Promise<ClaimableBalance[]> {
+  assertAccountAddress(account, "account");
   const url = `${config.horizonUrl}/claimable_balances?claimant=${encodeURIComponent(account)}&limit=200`;
   let res: Response;
   try {
@@ -520,6 +554,7 @@ export async function listCreated(
   account: StellarAddress,
   config: ResolvedConfig,
 ): Promise<ClaimableBalance[]> {
+  assertAccountAddress(account, "account");
   const url = `${config.horizonUrl}/claimable_balances?sponsor=${encodeURIComponent(account)}&limit=200`;
   let res: Response;
   try {
@@ -537,10 +572,11 @@ export async function listCreated(
 /**
  * Fetch a single claimable balance by id.
  */
-export async function getBalance(
-  id: string,
-  config: ResolvedConfig,
-): Promise<ClaimableBalance> {
+export async function getBalance(id: string, config: ResolvedConfig): Promise<ClaimableBalance> {
+  assertNotSecretKey(id, "id");
+  if (!id || typeof id !== "string") {
+    throw new ValidationError("Invalid id: claimable balance id must be a non-empty string.");
+  }
   const url = `${config.horizonUrl}/claimable_balances/${encodeURIComponent(id)}`;
   let res: Response;
   try {

@@ -1,9 +1,15 @@
 {
   "network": "testnet",
   "networkPassphrase": "Test SDF Network ; September 2015",
+  "contractsRelease": "v0.1.0-testnet",
   "contracts": {
     "help_request": "CBPW3FPPKPT4YWT7NSWM2EZ5AMONGQQQBPAEYZBSBWSOUGY5B26A7RLL",
     "reputation": "CC46Y6JBSNNTHPZZCLLUILMWMSNLRC3MV46UQ2REQX3N4WI6PTDPOZ2C",
     "attestation": "CBGSEMRF6DKWPGYGFJBQG5UEUBGFDHEJQUB5EOYTS4C746J54AYAS7GN"
+  },
+  "wasmHashes": {
+    "help_request": "273b024842b5c11fd85deb2766fd6b7cf54c595149a62efcc2b6a0e7d060087e",
+    "reputation": "f9b88fb4a31247ab6eaff4845622c7db28358c3e6cc9bd52add577ac36ffb6cf",
+    "attestation": "21b89312d055119971c3e7c9e7e21c314d14edab292ac3fa9e1236579b0454b2"
   }
 }

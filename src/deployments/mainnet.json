@@ -1,7 +1,13 @@
 {
   "network": "mainnet",
   "networkPassphrase": "Public Global Stellar Network ; September 2015",
+  "contractsRelease": "v0.1.0-testnet",
   "contracts": {
+    "help_request": "",
+    "reputation": "",
+    "attestation": ""
+  },
+  "wasmHashes": {
     "help_request": "",
     "reputation": "",
     "attestation": ""

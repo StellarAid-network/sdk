@@ -1,0 +1,45 @@
+name: sync-contracts
+
+on:
+  repository_dispatch:
+    types: [contracts-released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "contracts git tag to sync (e.g. v0.1.0-testnet)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sdk
+      - name: Checkout contracts at released tag
+        uses: actions/checkout@v4
+        with:
+          repository: stellar-aid/contracts
+          ref: ${{ github.event.client_payload.tag || inputs.tag }}
+          path: contracts
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: sdk/pnpm-lock.yaml
+      - name: Sync deployments and verify build
+        working-directory: sdk
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm sync:deployments
+          pnpm build
+          pnpm typecheck
+          pnpm test

@@ -131,10 +131,7 @@ describe("buildCreate batching validation", () => {
 
   it(`throws ValidationError when total claimers exceed ${MAX_TOTAL_CLAIMANTS}`, async () => {
     // Generate 1001 addresses (exceeds limit).
-    const tooManyClaimers = Array.from(
-      { length: MAX_TOTAL_CLAIMANTS + 1 },
-      () => TEST_ADDRESS,
-    );
+    const tooManyClaimers = Array.from({ length: MAX_TOTAL_CLAIMANTS + 1 }, () => TEST_ADDRESS);
     const config: ResolvedConfig = { ...TEST_CONFIG, fetch: vi.fn() };
     await expect(
       buildCreate(

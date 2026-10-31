@@ -6,7 +6,7 @@
  * 2. Server-side SEP-10 challenge generation & verification (`@stellar-aid/sdk/auth`)
  * 3. Asset formatting and parsing (`formatAmount`, `parseAmount`)
  */
-import { Keypair } from "@stellar/stellar-sdk";
+import { Keypair, Transaction } from "@stellar/stellar-sdk";
 import { createStellarAid, formatAmount, parseAmount } from "../dist/index.js";
 import { auth } from "../dist/auth.js";
 
@@ -21,7 +21,7 @@ async function main() {
   console.log("Formatted back:", formatAmount(stroops));
 
   // 3. Wallet sign-in with SEP-10 (server side)
-  // Ephemeral throwaway keypairs for local demonstration (never use real secrets in code)
+  // Ephemeral throwaway keypairs for local demonstration (the SDK never accepts secret strings)
   const serverKeypair = Keypair.random();
   const userKeypair = Keypair.random();
   const homeDomain = "stellaraid.example";
@@ -29,20 +29,32 @@ async function main() {
 
   const challengeXdr = auth.createChallenge({
     account: userKeypair.publicKey(),
-    serverKey: serverKeypair.secret(),
+    serverKey: serverKeypair,
     homeDomain,
     networkPassphrase: aid.config.networkPassphrase,
   });
 
-  const signedXdr = auth.signChallenge({
+  // Simulated client wallet adapter (never passes secret keys into the SDK)
+  const walletAdapter = {
+    async signTransaction(unsignedXdr: string, opts?: { networkPassphrase?: string }) {
+      const tx = new Transaction(
+        unsignedXdr,
+        opts?.networkPassphrase ?? aid.config.networkPassphrase,
+      );
+      tx.sign(userKeypair);
+      return tx.toXDR();
+    },
+  };
+
+  const signedXdr = await auth.signChallenge({
     unsignedXdr: challengeXdr,
-    signerKey: userKeypair.secret(),
+    wallet: walletAdapter,
     networkPassphrase: aid.config.networkPassphrase,
   });
 
   const { token, address } = auth.verifyChallenge({
     signedXdr,
-    serverKey: serverKeypair.secret(),
+    serverKey: serverKeypair,
     homeDomain,
     jwtSecret,
     networkPassphrase: aid.config.networkPassphrase,

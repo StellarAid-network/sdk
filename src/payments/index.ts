@@ -16,6 +16,7 @@ import {
 import { NetworkError, ValidationError } from "../errors";
 import type { Asset, StellarAddress } from "../types";
 import type { ResolvedConfig } from "../network/config";
+import { assertAccountAddress, assertPositiveAmount, assertValidAsset } from "../validation";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,17 +29,19 @@ function toStellarAsset(asset: Asset): StellarAsset {
   return new StellarAsset(asset.code, asset.issuer);
 }
 
-function isValidAddress(address: string): boolean {
-  // Stellar addresses are 56 characters starting with G.
-  // The Stellar SDK validates fully when building operations; this is a cheap early guard.
-  return typeof address === "string" && address.length === 56 && address.startsWith("G");
-}
-
 /** Load a Stellar account record using the config's fetch. */
 async function loadAccount(
   address: StellarAddress,
   config: ResolvedConfig,
-): Promise<{ sequence: string; balances: Array<{ asset_type: string; asset_code?: string; asset_issuer?: string; balance: string }> }> {
+): Promise<{
+  sequence: string;
+  balances: Array<{
+    asset_type: string;
+    asset_code?: string;
+    asset_issuer?: string;
+    balance: string;
+  }>;
+}> {
   const url = `${config.horizonUrl}/accounts/${encodeURIComponent(address)}`;
   let res: Response;
   try {
@@ -52,7 +55,15 @@ async function loadAccount(
   if (!res.ok) {
     throw new NetworkError(`Horizon returned ${res.status} loading account ${address}`);
   }
-  return res.json() as Promise<{ sequence: string; balances: Array<{ asset_type: string; asset_code?: string; asset_issuer?: string; balance: string }> }>;
+  return res.json() as Promise<{
+    sequence: string;
+    balances: Array<{
+      asset_type: string;
+      asset_code?: string;
+      asset_issuer?: string;
+      balance: string;
+    }>;
+  }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,11 +97,10 @@ export async function buildDonation(
 ): Promise<string> {
   const { from, to, asset, amount, memo } = opts;
 
-  if (!isValidAddress(from)) throw new ValidationError(`Invalid sender address: "${from}"`);
-  if (!isValidAddress(to)) throw new ValidationError(`Invalid recipient address: "${to}"`);
-  if (!amount || parseFloat(amount) <= 0) {
-    throw new ValidationError("amount must be a positive decimal string");
-  }
+  assertAccountAddress(from, "from");
+  assertAccountAddress(to, "to");
+  assertValidAsset(asset, "asset");
+  assertPositiveAmount(amount, "amount");
   if (memo !== undefined && Buffer.byteLength(memo, "utf8") > 28) {
     throw new ValidationError("memo must be at most 28 bytes");
   }
@@ -137,9 +147,8 @@ export async function ensureTrustline(
   asset: Asset,
   config: ResolvedConfig,
 ): Promise<string | null> {
-  if (!isValidAddress(account)) {
-    throw new ValidationError(`Invalid account address: "${account}"`);
-  }
+  assertAccountAddress(account, "account");
+  assertValidAsset(asset, "asset");
 
   // Native XLM needs no trustline.
   if (!asset.issuer) {
@@ -150,9 +159,7 @@ export async function ensureTrustline(
 
   const hasTrustline = accountData.balances.some(
     (b) =>
-      b.asset_type !== "native" &&
-      b.asset_code === asset.code &&
-      b.asset_issuer === asset.issuer,
+      b.asset_type !== "native" && b.asset_code === asset.code && b.asset_issuer === asset.issuer,
   );
 
   if (hasTrustline) {
