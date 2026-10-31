@@ -30,6 +30,6 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm docs
+pnpm run docs
 npm pack --dry-run
 ```

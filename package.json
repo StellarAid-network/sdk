@@ -72,6 +72,7 @@
     "test:watch": "vitest",
     "test:coverage": "pnpm build && vitest run --coverage",
     "docs": "typedoc",
+    "docs:build": "typedoc",
     "sync:bindings": "tsx scripts/sync-bindings.ts",
     "sync:deployments": "tsx scripts/sync-deployments.ts",
     "changeset": "changeset",

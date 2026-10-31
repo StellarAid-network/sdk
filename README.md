@@ -326,7 +326,7 @@ pnpm typecheck    # tsc --noEmit
 pnpm lint         # eslint
 pnpm format       # prettier
 pnpm test         # vitest unit tests
-pnpm docs         # generate typedoc into ./docs-site
+pnpm run docs    # generate typedoc into ./docs-site
 ```
 
 ### Using a local build in `web` or `api`
