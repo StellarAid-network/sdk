@@ -127,13 +127,18 @@ await aid.submit(await wallet.signTransaction(tx.xdr));
 ### 5. Wallet sign-in with SEP-10 (server side)
 
 ```ts
+import { Keypair } from "@stellar/stellar-sdk";
 import { auth } from "@stellar-aid/sdk/auth";
 
-// api: issue a challenge
-const challenge = await auth.createChallenge({ account: "G...", serverKey, homeDomain });
+// Server signer (Keypair or KMS/HSM signer — the SDK never accepts raw S... secret strings)
+const serverKey = Keypair.fromSecret(process.env.SEP10_SIGNING_KEY!);
 
-// client: sign challenge with wallet, then api: verify and issue a session token
-const { token } = await auth.verifyChallenge({ signedXdr, serverKey, homeDomain, jwtSecret });
+// api: issue a challenge
+const challengeXdr = auth.createChallenge({ account: "G...", serverKey, homeDomain });
+
+// client: sign challenge via wallet adapter, then api: verify and issue a session token
+const signedXdr = await auth.signChallenge({ unsignedXdr: challengeXdr, wallet });
+const { token } = auth.verifyChallenge({ signedXdr, serverKey, homeDomain, jwtSecret });
 ```
 
 ---
@@ -276,12 +281,14 @@ try {
 
 ```
 sdk/
+├── CHANGELOG.md               # Release changelog
 ├── package.json
 ├── tsconfig.json
 ├── tsup.config.ts             # Build config (ESM + CJS + d.ts)
 ├── vitest.config.ts
 ├── src/
 │   ├── index.ts               # createStellarAid + public exports
+│   ├── validation.ts          # Public boundary input validation & no-secret-key guards
 │   ├── network/               # Config, endpoints, passphrases
 │   ├── deployments/           # testnet.json, mainnet.json (synced from contracts)
 │   ├── giveaways/             # Claimable-balance builders and readers
@@ -295,10 +302,11 @@ sdk/
 │   ├── errors/
 │   ├── types/
 │   └── generated/             # ⚠️ AUTO-GENERATED bindings. Do not edit by hand.
+├── docs/                      # CONTRIBUTING-sdk.md, backlog.md, migration-template.md
 ├── scripts/
 │   ├── sync-bindings.ts       # Pull and regenerate bindings
 │   └── sync-deployments.ts    # Pull deployments JSON
-├── test/                      # Unit and integration tests
+├── test/                      # Unit, snippet, and integration tests
 ├── examples/                  # Runnable examples (node + browser)
 └── .github/workflows/
 ```
@@ -394,7 +402,7 @@ pnpm release            # build and publish (CI)
 
 | sdk | contracts | @stellar/stellar-sdk | Node |
 |---|---|---|---|
-| 0.x | 0.x | ^13 (check `peerDependencies`) | 20+ |
+| `0.1.0-testnet` | `v0.1.0-testnet` | `^13.0.0 \|\| ^14.0.0 \|\| ^17.0.0` (check `peerDependencies`) | 20+ |
 
 *(Updated on each release. The `peerDependencies` field in `package.json` is authoritative.)*
 
