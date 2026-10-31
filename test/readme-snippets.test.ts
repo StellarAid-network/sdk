@@ -1,6 +1,9 @@
 import { execSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Keypair, Transaction, xdr } from "@stellar/stellar-sdk";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   ContractError,
@@ -13,7 +16,16 @@ import { auth } from "../src/auth";
 import { decodeEvent } from "../src/events";
 import { predicates } from "../src/giveaways";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, "..");
+const distDir = path.resolve(rootDir, "dist");
+
 describe("Day 7 SDK: README Snippets & Clean Package Verification", () => {
+  beforeAll(() => {
+    if (!fs.existsSync(path.join(distDir, "index.js"))) {
+      execSync("pnpm build", { cwd: rootDir, stdio: "inherit" });
+    }
+  });
   it("executes Quick Start #1, #2, #3, predicates, and assets snippets", async () => {
     const creator = Keypair.random().publicKey();
     const claimerA = Keypair.random().publicKey();
